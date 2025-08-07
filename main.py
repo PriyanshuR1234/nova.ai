@@ -1,7 +1,6 @@
 # main.py
 
 from gtts import gTTS
-from playsound import playsound
 import speech_recognition as sr
 import datetime
 import random
@@ -21,39 +20,48 @@ from confirm_and_request import confirm_and_request_ride
 def nova_speak(text):
     print(f"\n🔊 Nova: {text}")
     # Check if we're in a production environment
-    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('RENDER') == 'true':
         # In production, just print the text
         return
     else:
         # In development, use text-to-speech
-        tts = gTTS(text=text, lang='en')
-        filename = f"nova_{random.randint(1000,9999)}.mp3"
-        tts.save(filename)
-        playsound(filename)
-        os.remove(filename)
+        try:
+            from playsound import playsound
+            tts = gTTS(text=text, lang='en')
+            filename = f"nova_{random.randint(1000,9999)}.mp3"
+            tts.save(filename)
+            playsound(filename)
+            os.remove(filename)
+        except ImportError:
+            # If playsound is not available, just print the text
+            print(f"Text-to-speech not available: {text}")
 
 # === Listen Function ===
 def nova_listen():
     # Check if we're in a production environment
-    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('RENDER') == 'true':
         # In production, return a default response for testing
         return "book a cab"
     
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as mic:
-        print("🎙️ Listening...")
-        recognizer.adjust_for_ambient_noise(mic)
-        try:
-            audio = recognizer.listen(mic, timeout=8, phrase_time_limit=10)
-            query = recognizer.recognize_google(audio, language='en-IN')
-            print(f"🗣️ You said: {query}")
-            return query.lower()
-        except sr.WaitTimeoutError:
-            print("⏱️ No response detected.")
-            return ""
-        except:
-            nova_speak("Sorry, I didn't understand.")
-            return ""
+    try:
+        recognizer = sr.Recognizer()
+        with sr.Microphone() as mic:
+            print("🎙️ Listening...")
+            recognizer.adjust_for_ambient_noise(mic)
+            try:
+                audio = recognizer.listen(mic, timeout=8, phrase_time_limit=10)
+                query = recognizer.recognize_google(audio, language='en-IN')
+                print(f"🗣️ You said: {query}")
+                return query.lower()
+            except sr.WaitTimeoutError:
+                print("⏱️ No response detected.")
+                return ""
+            except:
+                nova_speak("Sorry, I didn't understand.")
+                return ""
+    except Exception as e:
+        print(f"Microphone not available: {e}")
+        return "book a cab"  # Default response when microphone is not available
 
 # === Greeting ===
 def get_time_greeting():
@@ -97,7 +105,7 @@ def open_uber_with_persistence():
         )
         
         # Add headless mode for production environment
-        if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+        if os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('RENDER') == 'true':
             options.add_argument('--headless')
             options.add_argument('--disable-gpu')
             options.add_argument('--no-sandbox')
@@ -149,7 +157,7 @@ def nova_loop():
     awake = False
 
     # In production, skip the wake-up command
-    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('RENDER') == 'true':
         awake = True
         nova_speak(get_time_greeting())
 

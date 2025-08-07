@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: nova-agentic-ai
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: RENDER
+        value: true
+      - key: PYTHON_VERSION
+        value: 3.11.5
+    autoDeploy: true
