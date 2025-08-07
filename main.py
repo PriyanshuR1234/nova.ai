@@ -20,14 +20,25 @@ from confirm_and_request import confirm_and_request_ride
 # === Speak Function ===
 def nova_speak(text):
     print(f"\n🔊 Nova: {text}")
-    tts = gTTS(text=text, lang='en')
-    filename = f"nova_{random.randint(1000,9999)}.mp3"
-    tts.save(filename)
-    playsound(filename)
-    os.remove(filename)
+    # Check if we're in a production environment
+    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+        # In production, just print the text
+        return
+    else:
+        # In development, use text-to-speech
+        tts = gTTS(text=text, lang='en')
+        filename = f"nova_{random.randint(1000,9999)}.mp3"
+        tts.save(filename)
+        playsound(filename)
+        os.remove(filename)
 
 # === Listen Function ===
 def nova_listen():
+    # Check if we're in a production environment
+    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+        # In production, return a default response for testing
+        return "book a cab"
+    
     recognizer = sr.Recognizer()
     with sr.Microphone() as mic:
         print("🎙️ Listening...")
@@ -77,21 +88,30 @@ def open_uber_with_persistence():
     nova_speak("Opening Uber mobile website. Please wait...")
 
     try:
-        username = getpass.getuser()
-        custom_profile = f"C:\\Users\\{username}\\clova-mobile-profile"
-
+        # Configure Chrome options for headless operation in production
         options = uc.ChromeOptions()
         options.add_argument(
             "user-agent=Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
             "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 "
             "Mobile/15E148 Safari/604.1"
         )
-        options.add_argument(f"--user-data-dir={custom_profile}")
-        options.add_argument("--profile-directory=Profile1")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
+        
+        # Add headless mode for production environment
+        if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+            options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+        else:
+            # For local development, use persistent profile
+            username = getpass.getuser()
+            custom_profile = f"C:\\Users\\{username}\\clova-mobile-profile"
+            options.add_argument(f"--user-data-dir={custom_profile}")
+            options.add_argument("--profile-directory=Profile1")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
 
-        # ✅ Don't add 'detach' for undetected_chromedriver
+        # Initialize Chrome driver
         driver = uc.Chrome(version_main=138, options=options)
         driver.set_window_size(420, 900)
 
@@ -102,8 +122,6 @@ def open_uber_with_persistence():
         enter_location_details(driver, nova_speak, nova_listen)
         read_ride_options(driver)
         confirm_and_request_ride(driver)
-
-
 
     except Exception as e:
         print(f"⚠️ Error: {e}")
@@ -129,6 +147,11 @@ def handle_command(cmd):
 def nova_loop():
     nova_speak("Nova is standing by. Say 'wake up Nova' to begin.")
     awake = False
+
+    # In production, skip the wake-up command
+    if os.environ.get('RAILWAY_ENVIRONMENT') == 'production':
+        awake = True
+        nova_speak(get_time_greeting())
 
     while True:
         command = nova_listen()
