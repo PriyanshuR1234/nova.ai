@@ -1,0 +1,17 @@
+[build]
+builder = "nixpacks"
+watchPatterns = ["**/*.py", "**/*.html"]
+
+[deploy]
+startCommand = "gunicorn app:app"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[nixpacks]
+providers = ["python"]
+
+# This is important for Railway to recognize as a web service
+[service]
+type = "web"
