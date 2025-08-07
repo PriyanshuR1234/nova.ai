@@ -13,15 +13,53 @@ import platform
 
 def check_python_version():
     """Check if Python version is compatible"""
-    required_version = (3, 10)
+    min_required_version = (3, 9)
+    recommended_version = (3, 9, 18)  # Recommended for Render deployment
     current_version = sys.version_info
     
-    if current_version < required_version:
-        print(f"❌ Python {required_version[0]}.{required_version[1]} or higher is required")
+    if current_version < min_required_version:
+        print(f"❌ Python {min_required_version[0]}.{min_required_version[1]} or higher is required")
         print(f"   Current version: {current_version[0]}.{current_version[1]}")
         return False
+    elif current_version.major == recommended_version[0] and current_version.minor == recommended_version[1]:
+        print(f"✅ Python version {current_version[0]}.{current_version[1]} is ideal for deployment")
+        return True
     else:
-        print(f"✅ Python version {current_version[0]}.{current_version[1]} is compatible")
+        print(f"⚠️ Python version {current_version[0]}.{current_version[1]} is compatible but not ideal for deployment")
+        print(f"   Recommended version: {recommended_version[0]}.{recommended_version[1]}.{recommended_version[2]} for Render deployment")
+        return True
+
+def check_werkzeug_compatibility():
+    """Check if werkzeug version is compatible with Flask"""
+    try:
+        import pkg_resources
+        
+        flask_version = pkg_resources.get_distribution("flask").version
+        werkzeug_version = pkg_resources.get_distribution("werkzeug").version
+        
+        print(f"\n🔍 Checking Flask and Werkzeug compatibility...")
+        print(f"   Flask version: {flask_version}")
+        print(f"   Werkzeug version: {werkzeug_version}")
+        
+        # Check for known compatibility issues
+        if flask_version.startswith("2.0") and not werkzeug_version.startswith("2.0"):
+            print(f"⚠️ Potential compatibility issue: Flask {flask_version} works best with Werkzeug 2.0.x")
+            print(f"   Current Werkzeug version is {werkzeug_version}")
+            
+            # Try to import url_quote from werkzeug.urls
+            try:
+                from werkzeug.urls import url_quote
+                print("✅ Successfully imported url_quote from werkzeug.urls")
+            except ImportError as e:
+                print(f"❌ ImportError: {e}")
+                print("   This is likely to cause deployment errors on Render")
+                print("   Consider installing werkzeug==2.0.3 for compatibility")
+                return False
+        
+        return True
+    except (pkg_resources.DistributionNotFound, ImportError) as e:
+        print(f"⚠️ Could not check Flask/Werkzeug compatibility: {e}")
+        print("   This check will be performed after dependencies are installed")
         return True
 
 def install_dependencies():
@@ -126,18 +164,35 @@ def main():
             print("❌ undetected-chromedriver not found, trying manual installation")
             undetected_ok = install_undetected_chromedriver_manually()
     
+    # Check werkzeug compatibility
+    werkzeug_ok = check_werkzeug_compatibility()
+    
     # Summary
     print("\n📊 Setup Summary:")
     print(f"Python version: {'✅' if python_ok else '❌'}")
     print(f"Virtual environment: {'✅' if venv_ok else '❌'}")
     print(f"Chrome installation: {'✅' if chrome_ok else '❌'}")
     print(f"Dependencies: {'✅' if deps_ok else '❌'}")
+    print(f"Werkzeug compatibility: {'✅' if werkzeug_ok else '⚠️'}")
+    
+    # Check for deployment readiness
+    deployment_ready = python_ok and chrome_ok and deps_ok and werkzeug_ok
+    if not deployment_ready and werkzeug_ok is False:
+        print("\n⚠️ Your setup may work locally but could have issues when deployed to Render")
+        print("   Consider running: pip install werkzeug==2.0.3")
     
     if python_ok and chrome_ok and deps_ok:
         print("\n✅ Setup completed successfully!")
-        print("\nTo run the application:")
+        print("\nTo run the application locally:")
         print("1. Activate the virtual environment")
         print("2. Run 'python app.py'")
+        
+        if deployment_ready:
+            print("\n🚀 Your application is ready for deployment to Render!")
+            print("   See the README.md for deployment instructions.")
+        else:
+            print("\n⚠️ Your application may need adjustments before deployment")
+            print("   See the README.md for troubleshooting tips.")
     else:
         print("\n❌ Setup completed with issues. Please fix the problems above.")
 

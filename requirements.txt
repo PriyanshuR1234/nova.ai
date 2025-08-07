@@ -1,5 +1,9 @@
+# Core web dependencies - fixed versions for compatibility
 flask==2.0.1
 gunicorn==20.1.0
+werkzeug==2.0.3
+# Pin setuptools to avoid pkg_resources deprecation warning
+setuptools<81.0.0
 gtts==2.2.4
 # Removing playsound as it's causing build issues on Render
 # playsound==1.3.0

@@ -2,6 +2,8 @@
 
 Nova is a voice-controlled assistant that helps you book cabs and more. This project uses Flask for the web interface and integrates with various voice and browser automation technologies.
 
+> **Note**: This project has been updated to fix deployment issues on Render.com by addressing dependency compatibility problems.
+
 ## Features
 
 - Voice-controlled cab booking
@@ -11,7 +13,7 @@ Nova is a voice-controlled assistant that helps you book cabs and more. This pro
 
 ## Prerequisites
 
-- Python 3.10.13
+- Python 3.9.18 (recommended for deployment compatibility)
 - Chrome browser
 - Required Python packages (see requirements.txt)
 
@@ -145,11 +147,70 @@ railway up
 - **Deployment fails**: Check the logs in the Railway dashboard
 - **Chrome/Selenium issues**: The application is configured to run in headless mode on Railway, but you may need additional configuration for browser automation in a cloud environment
 
+## Deployment to Render.com
+
+### Step 1: Prepare Your Project
+
+Ensure your project has the following files:
+- `requirements.txt` - Lists all Python dependencies with specific versions
+- `runtime.txt` - Specifies Python version (python-3.9.18)
+- `Procfile` - Tells Render how to run your app (web: gunicorn app:app)
+- `render.yaml` - Configuration file for Render (included in this repository)
+- `startup.sh` - Custom startup script to ensure proper environment setup
+
+### Step 2: Create a Render Account
+
+1. Go to [Render.com](https://render.com/) and sign up for an account
+2. Verify your email address
+
+### Step 3: Deploy Your Project
+
+#### Option 1: Deploy via GitHub
+
+1. Push your code to a GitHub repository
+2. Log in to Render dashboard
+3. Click "New" > "Web Service"
+4. Select your repository
+5. Configure the service:
+   - Name: nova-agentic-ai
+   - Environment: Python
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `bash startup.sh`
+6. Add environment variables:
+   - `RENDER=true`
+   - `PYTHON_VERSION=3.9.18`
+7. Click "Create Web Service"
+
+### Step 4: Monitor Your Deployment
+
+1. In the Render dashboard, go to your web service
+2. Click on the "Logs" tab to see deployment status
+3. Once deployed, Render will provide a public URL
+
+## Troubleshooting Render Deployment
+
+### Common Issues and Solutions
+
+- **Werkzeug Import Error**: If you see an error like `ImportError: cannot import name 'url_quote' from 'werkzeug.urls'`, ensure you're using compatible versions of Flask and Werkzeug. The current configuration uses Flask 2.0.1 with Werkzeug 2.0.3.
+
+- **pkg_resources Deprecation Warning**: If you see warnings about pkg_resources being deprecated, you can ignore these or pin setuptools to a version below 81.0.0 as done in the requirements.txt file.
+
+- **Chrome/Selenium Issues**: For headless browser automation on Render, the application uses specific Chrome options. If you encounter issues, check the logs and consider modifying the Chrome options in the code.
+
+- **Deployment Fails**: Run the included diagnostic scripts to check your environment:
+  ```
+  python check_env.py
+  python compatibility.py
+  python deployment_check.py
+  ```
+
+- **Python Version Compatibility**: This project is configured to use Python 3.9.18 for maximum compatibility with all dependencies. If you change the Python version, you may need to adjust dependency versions.
+
 ## Alternative Deployment Options
 
-If Railway deployment is not possible due to the free tier limitations, consider these alternatives:
+If Render deployment is not suitable for your needs, consider these alternatives:
 
-1. **Heroku**: Similar to Railway but with different free tier limitations
-2. **Render**: Offers free tier for web services
+1. **Railway**: Similar to Render but with different tier limitations
+2. **Heroku**: Popular platform for Python web applications
 3. **PythonAnywhere**: Good for Python web applications
 4. **Google Cloud Run**: Serverless deployment option with free tier

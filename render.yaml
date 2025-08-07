@@ -3,10 +3,10 @@ services:
     name: nova-agentic-ai
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: bash startup.sh
     envVars:
       - key: RENDER
         value: true
       - key: PYTHON_VERSION
-        value: 3.11.5
+        value: 3.9.18
     autoDeploy: true
