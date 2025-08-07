@@ -8,6 +8,7 @@ import os
 import getpass
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
+# playsound is imported conditionally in nova_speak function
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from login import click_login_button
@@ -26,42 +27,53 @@ def nova_speak(text):
     else:
         # In development, use text-to-speech
         try:
-            from playsound import playsound
-            tts = gTTS(text=text, lang='en')
-            filename = f"nova_{random.randint(1000,9999)}.mp3"
-            tts.save(filename)
-            playsound(filename)
-            os.remove(filename)
-        except ImportError:
-            # If playsound is not available, just print the text
-            print(f"Text-to-speech not available: {text}")
+            # Only import playsound in development environment
+            try:
+                from playsound import playsound
+                tts = gTTS(text=text, lang='en')
+                filename = f"nova_{random.randint(1000,9999)}.mp3"
+                tts.save(filename)
+                playsound(filename)
+                os.remove(filename)
+            except ImportError:
+                # If playsound is not available, just print the text
+                print(f"Text-to-speech not available: {text}")
+        except Exception as e:
+            print(f"Text-to-speech error: {e}")
+            # Continue execution even if TTS fails
 
 # === Listen Function ===
 def nova_listen():
     # Check if we're in a production environment
     if os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('RENDER') == 'true':
         # In production, return a default response for testing
+        print("🤖 Running in production mode - using default response")
         return "book a cab"
     
     try:
         recognizer = sr.Recognizer()
-        with sr.Microphone() as mic:
-            print("🎙️ Listening...")
-            recognizer.adjust_for_ambient_noise(mic)
-            try:
-                audio = recognizer.listen(mic, timeout=8, phrase_time_limit=10)
-                query = recognizer.recognize_google(audio, language='en-IN')
-                print(f"🗣️ You said: {query}")
-                return query.lower()
-            except sr.WaitTimeoutError:
-                print("⏱️ No response detected.")
-                return ""
-            except:
-                nova_speak("Sorry, I didn't understand.")
-                return ""
+        try:
+            with sr.Microphone() as mic:
+                print("🎙️ Listening...")
+                recognizer.adjust_for_ambient_noise(mic)
+                try:
+                    audio = recognizer.listen(mic, timeout=8, phrase_time_limit=10)
+                    query = recognizer.recognize_google(audio, language='en-IN')
+                    print(f"🗣️ You said: {query}")
+                    return query.lower()
+                except sr.WaitTimeoutError:
+                    print("⏱️ No response detected.")
+                    return ""
+                except Exception as e:
+                    print(f"Speech recognition error: {e}")
+                    nova_speak("Sorry, I didn't understand.")
+                    return ""
+        except Exception as e:
+            print(f"Microphone initialization error: {e}")
+            return "book a cab"  # Default response when microphone initialization fails
     except Exception as e:
-        print(f"Microphone not available: {e}")
-        return "book a cab"  # Default response when microphone is not available
+        print(f"Speech recognition system error: {e}")
+        return "book a cab"  # Default response when speech recognition system fails
 
 # === Greeting ===
 def get_time_greeting():
@@ -106,10 +118,17 @@ def open_uber_with_persistence():
         
         # Add headless mode for production environment
         if os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('RENDER') == 'true':
+            print("🤖 Running in headless mode for production environment")
             options.add_argument('--headless')
             options.add_argument('--disable-gpu')
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--window-size=420,900')
+            options.add_argument('--disable-extensions')
+            options.add_argument('--disable-setuid-sandbox')
+            options.add_argument('--disable-web-security')
+            options.add_argument('--disable-features=VizDisplayCompositor')
+            options.add_argument('--ignore-certificate-errors')
         else:
             # For local development, use persistent profile
             username = getpass.getuser()
@@ -119,21 +138,51 @@ def open_uber_with_persistence():
             options.add_argument("--no-sandbox")
             options.add_argument("--disable-dev-shm-usage")
 
-        # Initialize Chrome driver
-        driver = uc.Chrome(version_main=138, options=options)
-        driver.set_window_size(420, 900)
+        try:
+            # Initialize Chrome driver with more flexible version handling
+            print("Initializing Chrome driver...")
+            try:
+                # Try with specific version first
+                driver = uc.Chrome(version_main=138, options=options)
+            except Exception as version_error:
+                print(f"Error with specific Chrome version: {version_error}")
+                # Fall back to automatic version detection
+                driver = uc.Chrome(options=options)
+                
+            # Set window size if not already set in options
+            if os.environ.get('RAILWAY_ENVIRONMENT') != 'production' and os.environ.get('RENDER') != 'true':
+                driver.set_window_size(420, 900)
 
-        # Open Uber mobile site
-        driver.get("https://m.uber.com/go/home")
+            # Open Uber mobile site with retry logic
+            print("Opening Uber mobile site...")
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    driver.get("https://m.uber.com/go/home")
+                    break
+                except Exception as page_error:
+                    if attempt < max_retries - 1:
+                        print(f"Error loading page (attempt {attempt+1}): {page_error}. Retrying...")
+                    else:
+                        raise
 
-        click_login_button(driver, nova_speak)
-        enter_location_details(driver, nova_speak, nova_listen)
-        read_ride_options(driver)
-        confirm_and_request_ride(driver)
+            # Execute the Uber flow
+            click_login_button(driver, nova_speak)
+            enter_location_details(driver, nova_speak, nova_listen)
+            read_ride_options(driver)
+            confirm_and_request_ride(driver)
+            
+        except Exception as driver_error:
+            print(f"⚠️ Chrome driver error: {driver_error}")
+            raise
 
     except Exception as e:
-        print(f"⚠️ Error: {e}")
+        print(f"⚠️ Error in open_uber_with_persistence: {e}")
         nova_speak("Failed to open Uber mobile website.")
+        # In production, we want to see the full error details
+        if os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('RENDER') == 'true':
+            import traceback
+            traceback.print_exc()
 
 
 # === Command Handler ===

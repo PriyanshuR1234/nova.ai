@@ -41,9 +41,16 @@ def check_dependencies():
         import undetected_chromedriver
         import selenium
         import gtts
-        import playsound
         import speech_recognition
-        print("✅ All key dependencies are installed")
+        
+        # Check for playsound but don't fail if it's not available
+        try:
+            import playsound
+            print("✅ playsound is available for local development")
+        except ImportError:
+            print("ℹ️ playsound is not available - this is OK for production environments")
+            
+        print("✅ All required dependencies are installed")
         return True
     except ImportError as e:
         print(f"❌ Missing dependency: {e}")

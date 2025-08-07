@@ -3,34 +3,69 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from gtts import gTTS
 import os
-from playsound import playsound
 import time
 import speech_recognition as sr
 
+# Check if we're in a production environment
+is_production = os.environ.get('RAILWAY_ENVIRONMENT') == 'production' or os.environ.get('RENDER') == 'true'
+
 def nova_speak(text):
-    tts = gTTS(text=text, lang='en')
-    filename = "ride_options.mp3"
-    tts.save(filename)
-    playsound(filename)
-    os.remove(filename)
+    print(f"🔊 Nova: {text}")
+    
+    # In production, just print the text
+    if is_production:
+        return
+        
+    # In development, use text-to-speech
+    try:
+        # Only import playsound in development environment
+        try:
+            from playsound import playsound
+            tts = gTTS(text=text, lang='en')
+            filename = "ride_options.mp3"
+            tts.save(filename)
+            playsound(filename)
+            os.remove(filename)
+        except ImportError:
+            print(f"Text-to-speech not available: playsound module not found")
+    except Exception as e:
+        print(f"Text-to-speech error: {e}")
+        # Continue execution even if TTS fails
 
 def listen_to_user():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        while True:
-            print("🎙️ Listening...")
-            audio = recognizer.listen(source)
-            try:
-                user_input = recognizer.recognize_google(audio)
-                print(f"🗣️ You said: {user_input}")
-                return user_input.lower()
-            except sr.UnknownValueError:
-                print("❌ Couldn't understand audio")
-                nova_speak("Sorry, I didn't catch that. Please say it again.")
-            except sr.RequestError:
-                print("❌ Speech recognition service failed")
-                nova_speak("There was a problem with speech recognition.")
-                return None
+    # In production, return a default response
+    if is_production:
+        print("🤖 Running in production mode - using default response")
+        return "uberx"
+        
+    try:
+        recognizer = sr.Recognizer()
+        try:
+            with sr.Microphone() as source:
+                while True:
+                    print("🎙️ Listening...")
+                    try:
+                        audio = recognizer.listen(source, timeout=8, phrase_time_limit=10)
+                        try:
+                            user_input = recognizer.recognize_google(audio)
+                            print(f"🗣️ You said: {user_input}")
+                            return user_input.lower()
+                        except sr.UnknownValueError:
+                            print("❌ Couldn't understand audio")
+                            nova_speak("Sorry, I didn't catch that. Please say it again.")
+                        except sr.RequestError:
+                            print("❌ Speech recognition service failed")
+                            nova_speak("There was a problem with speech recognition.")
+                            return "uberx"  # Default to UberX on error
+                    except sr.WaitTimeoutError:
+                        print("⏱️ No response detected.")
+                        return "uberx"  # Default to UberX on timeout
+        except Exception as e:
+            print(f"Microphone initialization error: {e}")
+            return "uberx"  # Default to UberX on microphone error
+    except Exception as e:
+        print(f"Speech recognition system error: {e}")
+        return "uberx"  # Default to UberX on system error
 
 def read_ride_options(driver):
     try:

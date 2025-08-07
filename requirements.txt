@@ -10,5 +10,5 @@ selenium==4.10.0
 webdriver-manager==3.8.6
 requests==2.28.1
 python-dotenv==0.21.0
-# Adding Chrome dependencies for headless operation on Render
-chromium-browser
+# Chrome dependencies for headless operation on Render will be handled by the Render environment
+# No need to install chromium-browser as a Python package
